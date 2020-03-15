@@ -14,7 +14,7 @@
 
 import groovy.transform.Field
 
-@Field String VERSION = "1.0.0"
+@Field String VERSION = "1.0.3"
 
 @Field List<String> LOG_LEVELS = ["error", "warn", "info", "debug", "trace"]
 @Field String DEFAULT_LOG_LEVEL = LOG_LEVELS[1]
@@ -32,10 +32,12 @@ metadata {
     capability "Configuration"
     capability "Initialize"
     command "clearState"
+    attribute "temperatureStatus", "string"
     attribute "position", "string"
+    attribute "probe", "string"
 
     fingerprint mfr:"0086", prod:"0002"
-    fingerprint deviceId: "122", inClusters: "0x5E, 0x85, 0x59, 0x80, 0x70, 0x7A, 0x71, 0x73, 0x31, 0x86, 0x84, 0x60, 0x8E, 0x72, 0x5A"
+    fingerprint deviceId: "122", inClusters: "0x5E, 0x85, 0x59, 0x80, 0x70, 0x7A, 0x71, 0x73, 0x31, 0x86, 0x84, 0x60, 0x8E, 0x72, 0x5A" // ZW122
   }
 
   preferences {
@@ -54,6 +56,8 @@ metadata {
         input name: "param48", title: "Sensor reports", description: "What types of reports should the sensor trigger", type: "enum", options:[[0:"Disable"], [55:"All"], [1:"Notification Report for Water Leak event"], [2:"Notification Report for Vibration event"], [4:"Configuration Report for Tilt sensor"], [16:"Notification Report for Under heat alarm"], [32:"Notification Report for Overheat alarm"]], defaultValue: 55, required: true
         input name: "param39", title: "Report Low battery threshold", description: "When the current battery level is lower than this value, it will send out the low battery alarm", type: "number", range: "10..50", defaultValue: 10, required: true
         input name: "param64", title: "Report Temperature unit", description: "Default unit of the automatic temperature report", type: "enum", options:[[0:"Celsius"], [1:"Fahrenheit"]], defaultValue: 0, required: true
+        input name: "param88", title: "Probe 1 Value", description: "Basic Set will be sent to the associated nodes in association Group 3 when the Sensor probe 1 is triggered", type: "enum", options:[[0:"Send nothing"], [1:"Presence of water: 0xFF, Absence of water: 0x00"], [2:"Presence of water:0x00, Absence of water: 0xFF"]], defaultValue: 0, required: true
+        input name: "param89", title: "Probe 2 Value", description: "Basic Set will be sent to the associated nodes in association Group 4 when the Sensor probe 2 is triggered", type: "enum", options:[[0:"Send nothing"], [1:"Presence of water: 0xFF, Absence of water: 0x00"], [2:"Presence of water:0x00, Absence of water: 0xFF"]], defaultValue: 0, required: true
         input name: "param94", title: "Report Power source", description: "To set which power source level is reported via the Battery CC", type: "enum", options:[[0:"USB power"], [1:"CR123A battery"]], defaultValue: 1, required: true
         input name: "param101", title: "Report unsolicited Lifeline", description: "To set what unsolicited report would be sent to the Lifeline group", type: "enum", options:[[0:"Send Nothing"], [1:"Battery Report is enabled"], [2:"Multilevel sensor report for temperature is enabled"], [3:"Battery Report and Multilevel sensor report for temperature are enabled"]], defaultValue: 3, required: true
         input name: "param111", title: "Report interval group #1", description: "Time interval for sending reports. Note: 1. The unit of interval time is second if USB power. 2. If battery power, the minimum interval time is equal to Wake Up interval set by the Wake Up CC", type: "enum", options:[[10:"10s"], [20:"20s"], [30:"30s"], [60:"1m"], [120:"2m"], [180:"3m"], [240:"4m"], [300:"5m"], [480:"8m"], [600:"10m"], [900:"15m"], [1800: "30m"], [3600: "1h"], [7200: "2h"]], defaultValue: 1800, required: true
@@ -65,7 +69,7 @@ metadata {
 def installed() {
   logger("debug", "installed(${VERSION})")
 
-  if (state.driverInfo == null || state.driverInfo.isEmpty()) {
+  if (state.driverInfo == null || state.driverInfo.isEmpty() || state.driverInfo.ver != VERSION) {
     state.driverInfo = [ver:VERSION, status:'Current version']
     state.driverInfo.configSynced = false
   }
@@ -79,10 +83,12 @@ def installed() {
 
 def initialize() {
   logger("debug", "initialize()")
+  sendEvent(name: "probe", value: "dry", displayed: true)
   sendEvent(name: "water", value: "dry", displayed: true)
   sendEvent(name: "shock", value: "clear", displayed: true)
   sendEvent(name: "powerSource", value: "unknown", displayed: true)
   sendEvent(name: "position", value: "unknown", displayed: true)
+  sendEvent(name: "temperatureStatus", value: "clear", displayed: true)
 }
 
 def updated() {
@@ -125,6 +131,7 @@ def clearState() {
   } else {
     state.deviceInfo.clear()
   }
+  installed()
 }
 
 def parse(String description) {
@@ -163,25 +170,28 @@ def zwaveEvent(hubitat.zwave.commands.configurationv1.ConfigurationReport cmd) {
   switch (cmd.parameterNumber) {
     case 9:
       if (cmd.size == 2) {
-        result << createEvent(name: "powerSource", value: "DC", descriptionText: "Connected to power via USB", displayed: true)
+        result << createEvent(name: "powerSource", value: "DC", descriptionText: "Connected to power via USB")
       } else {
-        result << createEvent(name: "powerSource", value: "battery", descriptionText: "Running on battery power", displayed: true)
+        result << createEvent(name: "powerSource", value: "battery", descriptionText: "Running on battery power")
       }
     break;
     case 84:
       if (cmd.size == 0) {
-        result << createEvent(name: "position", value: "horizontal", descriptionText: "Mounted horizontally", displayed: true)
+        result << createEvent(name: "position", value: "horizontal", descriptionText: "Mounted horizontally")
       } else if (cmd.size == 1) {
-        result << createEvent(name: "position", value: "vertical", descriptionText: "Mounted vertically", displayed: true)
+        result << createEvent(name: "position", value: "vertical", descriptionText: "Mounted vertically")
       }
     break;
     case 136:
       if (cmd.size == 1) {
-        result << createEvent(name: "probe", value: "1", descriptionText: "Detected water on probe 1", displayed: true)
+        result << createEvent(name: "probe", value: "1", descriptionText: "probe 1 detected water")
+        if(logDescText) { log.info "Detected water on probe 1" }
       } else if (cmd.size == 2) {
-        result << createEvent(name: "probe", value: "2", descriptionText: "Detected water on probe 2", displayed: true)
+        result << createEvent(name: "probe", value: "2", descriptionText: "probe 2 detected water")
+        if(logDescText) { log.info "Detected water on probe 2" }
       } else if (cmd.size == 3) {
-        result << createEvent(name: "probe", value: "3", descriptionText: "Detected water on both probes", displayed: true)
+        result << createEvent(name: "probe", value: "3", descriptionText: "Both probes have detected water")
+        if(logDescText) { log.info "Detected water on both probes" }
       }
     break;
     default:
@@ -190,6 +200,10 @@ def zwaveEvent(hubitat.zwave.commands.configurationv1.ConfigurationReport cmd) {
   }
 
   return result
+}
+
+def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpIntervalGet cmd) {
+  logger("trace", "zwaveEvent(WakeUpIntervalGet) - cmd: ${cmd.inspect()}")
 }
 
 def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
@@ -208,6 +222,8 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
     cmds = cmds + cmdSequence([
       zwave.associationV2.associationSet(groupingIdentifier:1, nodeId:zwaveHubNodeId),
       zwave.associationV2.associationSet(groupingIdentifier:2, nodeId:zwaveHubNodeId),
+      zwave.associationV2.associationSet(groupingIdentifier:3, nodeId:zwaveHubNodeId),
+      zwave.associationV2.associationSet(groupingIdentifier:4, nodeId:zwaveHubNodeId),
       zwave.wakeUpV2.wakeUpIntervalSet(seconds:wakeUpInterval.toInteger() * 60, nodeid:zwaveHubNodeId),
       zwave.configurationV1.configurationSet(parameterNumber: 2, size: 1, scaledConfigurationValue: param2.toInteger()),
       zwave.configurationV1.configurationSet(parameterNumber: 8, size: 1, scaledConfigurationValue: param8.toInteger()),
@@ -217,6 +233,8 @@ def zwaveEvent(hubitat.zwave.commands.wakeupv2.WakeUpNotification cmd) {
       zwave.configurationV1.configurationSet(parameterNumber: 64, size: 1, scaledConfigurationValue: param64.toInteger()),
       zwave.configurationV1.configurationSet(parameterNumber: 86, size: 1, scaledConfigurationValue: param86.toInteger()),
       zwave.configurationV1.configurationSet(parameterNumber: 87, size: 1, scaledConfigurationValue: param87.toInteger()),
+      zwave.configurationV1.configurationSet(parameterNumber: 88, size: 1, scaledConfigurationValue: param88.toInteger()),
+      zwave.configurationV1.configurationSet(parameterNumber: 89, size: 1, scaledConfigurationValue: param89.toInteger()),
       zwave.configurationV1.configurationSet(parameterNumber: 94, size: 1, scaledConfigurationValue: param94.toInteger()),
       zwave.configurationV1.configurationSet(parameterNumber: 101, size: 1, scaledConfigurationValue: param101.toInteger()),
       zwave.configurationV1.configurationSet(parameterNumber: 111, size: 4, scaledConfigurationValue: param111.toInteger()),
@@ -257,28 +275,36 @@ def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
   switch(cmd.notificationType) {
     case 0x05:
       if (cmd.event == 0x00) {
-        result << createEvent(name: "water", value: "dry", descriptionText: "Is dry", displayed: true)
-        result << createEvent(name: "probe", value: "dry", displayed: false)
+        result << createEvent(name: "water", value: "dry", descriptionText: "Sensor is dry")
+        result << createEvent(name: "probe", value: "dry")
+        if(logDescText) { log.info "Water cleared" }
       }
       if (cmd.event == 0x02) {
-        result << createEvent(name: "water", value: "wet", descriptionText: "Is wet", displayed: true)
+        result << createEvent(name: "water", value: "wet", descriptionText: "Sensor detected water")
+        if(logDescText) { log.info "Water detected" }
+        result << response(cmd(zwave.configurationV1.configurationGet(parameterNumber: 136)))
       }
     break
     case 0x04:
       if (cmd.event == 0x00) {
-        result << createEvent(descriptionText: "Temperature normalized", displayed: true)
+        result << createEvent(name: "temperatureStatus", value: "clear", descriptionText: "Temperature cleared")
+        if(logDescText) { log.info "Temperature cleared" }
       } else if (cmd.event <= 0x02) {
-        result << createEvent(descriptionText: "Detected overheat", displayed: true)
+        result << createEvent(name: "temperatureStatus", value: "overheat", descriptionText: "Detected overheat")
+        if(logDescText) { log.info "Temperature overheat detected" }
       } else if (cmd.event == 0x06) {
-        result << createEvent(descriptionText: "Detected low temperature", displayed: true)
+        result << createEvent(name: "temperatureStatus", value: "low", descriptionText: "Detected low temperature")
+        if(logDescText) { log.info "Temperature low detected" }
       }
     break
     case 0x07:
       if (cmd.event == 0x00) {
-        result << createEvent(name: "shock", value: "clear", descriptionText: "Shock cleared", displayed: true)
+        result << createEvent(name: "shock", value: "clear", descriptionText: "Shock cleared")
+        if(logDescText) { log.info "Shock cleared" }
       } else if (cmd.event == 0x03) {
-        result << createEvent(name: "shock", value: "detected", descriptionText: "Shock detected", displayed: true)
-        startTimer(motionTimeout, cancelMotion)
+        result << createEvent(name: "shock", value: "detected", descriptionText: "Shock detected")
+        if(logDescText) { log.info "Shock detected" }
+        startTimer(motionTimeout?.toInteger(), cancelMotion)
       }
     break
     default:
@@ -299,6 +325,11 @@ def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
   handleSensorValue(cmd.value)
 }
 
+def zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
+  logger("trace", "zwaveEvent(BasicSet) - cmd: ${cmd.inspect()}")
+  []
+}
+
 def zwaveEvent(hubitat.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd) {
   logger("trace", "zwaveEvent(SwitchBinaryReport) - cmd: ${cmd.inspect()}")
   handleSensorValue(cmd.value)
@@ -309,7 +340,7 @@ def zwaveEvent(hubitat.zwave.commands.sensormultilevelv5.SensorMultilevelReport 
   def result = []
 
   if (cmd.sensorType == 1) {
-    result << createEvent(name: "temperature", value: cmd.scaledSensorValue, unit: cmd.scale ? "\u00b0F" : "\u00b0C", displayed: true )
+    result << createEvent(name: "temperature", value: cmd.scaledSensorValue, unit: cmd.scale ? "\u00b0F" : "\u00b0C")
     if(logDescText) { log.info "Temperature is ${cmd.scaledSensorValue} ${cmd.scale ? "\u00b0F" : "\u00b0C"}" }
   } else {
     logger("warn", "zwaveEvent(SensorMultilevelReport) - Unknown sensorType - cmd: ${cmd.inspect()}")
@@ -340,8 +371,9 @@ def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
 def zwaveEvent(hubitat.zwave.commands.powerlevelv1.PowerlevelReport cmd) {
   logger("trace", "zwaveEvent(PowerlevelReport) - cmd: ${cmd.inspect()}")
 
-  def power = (cmd.powerLevel > 0) ? "minus${cmd.powerLevel}dBm" : "NormalPower"
+  String power = (cmd.powerLevel > 0) ? "minus${cmd.powerLevel}dBm" : "NormalPower"
   logger("debug", "Powerlevel Report: Power: ${power}, Timeout: ${cmd.timeout}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -354,6 +386,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   state.deviceInfo['zWaveProtocolSubVersion'] = "${cmd.zWaveProtocolSubVersion}"
 
   updateDataValue("firmware", "${cmd.applicationVersion}.${cmd.applicationSubVersion}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificReport cmd) {
@@ -363,6 +396,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificRepor
   state.deviceInfo['deviceIdDataFormat'] = "${cmd.deviceIdDataFormat}"
   state.deviceInfo['deviceIdDataLengthIndicator'] = "l${cmd.deviceIdDataLengthIndicator}"
   state.deviceInfo['deviceIdType'] = "${cmd.deviceIdType}"
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
@@ -376,6 +410,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   String msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
   updateDataValue("MSR", msr)
   updateDataValue("manufacturer", cmd.manufacturerName)
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -383,6 +418,7 @@ def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
 
   state.deviceInfo['firmwareChecksum'] = "${cmd.checksum}"
   state.deviceInfo['firmwareId'] = "${cmd.firmwareId}"
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
@@ -395,6 +431,7 @@ def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cm
     zwaveEvent(encapsulatedCommand)
   } else {
     logger("warn", "zwaveEvent(SecurityMessageEncapsulation) - Unable to extract Secure command from: ${cmd.inspect()}")
+    []
   }
 }
 
@@ -407,6 +444,7 @@ def zwaveEvent(hubitat.zwave.commands.crc16encapv1.Crc16Encap cmd) {
     zwaveEvent(encapsulatedCommand)
   } else {
     logger("warn", "zwaveEvent(Crc16Encap) - Unable to extract CRC16 command from: ${cmd.inspect()}")
+    []
   }
 }
 
@@ -419,34 +457,38 @@ def zwaveEvent(hubitat.zwave.commands.multichannelv3.MultiChannelCmdEncap cmd) {
     zwaveEvent(encapsulatedCommand, cmd.sourceEndPoint as Integer)
   } else {
     logger("warn", "zwaveEvent(MultiChannelCmdEncap) - Unable to extract MultiChannel command from: ${cmd.inspect()}")
+    []
   }
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityCommandsSupportedReport cmd) {
   logger("trace", "zwaveEvent(SecurityCommandsSupportedReport) - cmd: ${cmd.inspect()}")
   setSecured()
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.NetworkKeyVerify cmd) {
   logger("trace", "zwaveEvent(NetworkKeyVerify) - cmd: ${cmd.inspect()}")
   logger("info", "Secure inclusion was successful")
   setSecured()
+  []
 }
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
   logger("warn", "zwaveEvent(Command) - Unhandled - cmd: ${cmd.inspect()}")
-  [:]
+  []
 }
 
 def cancelMotion() {
   logger("debug", "cancelMotion()")
-  sendEvent(name: "shock", value: "clear", displayed: true)
+  if(logDescText) { log.info "Shock cleared" }
+  sendEvent(name: "shock", value: "clear")
 }
 
-private startTimer(seconds, function) {
+private startTimer(Integer seconds, function) {
   def now = new Date()
   def runTime = new Date(now.getTime() + (seconds * 1000))
-  runOnce(runTime, function) // runIn isn't reliable, use runOnce instead
+  runOnce(runTime, function)
 }
 
 private cmd(hubitat.zwave.Command cmd) {
@@ -508,7 +550,7 @@ private logger(level, msg) {
 }
 
 def updateCheck() {
-  def params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Aeotec/Aeotec%20Water%20Sensor%206.groovy"]
+  Map params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Aeotec/Aeotec%20Water%20Sensor%206.groovy"]
   asynchttpGet("updateCheckHandler", params)
 }
 

@@ -14,7 +14,7 @@
 
 import groovy.transform.Field
 
-@Field String VERSION = "1.0.1"
+@Field String VERSION = "1.0.3"
 
 @Field List<String> LOG_LEVELS = ["error", "warn", "info", "debug", "trace"]
 @Field String DEFAULT_LOG_LEVEL = LOG_LEVELS[1]
@@ -53,17 +53,14 @@ metadata {
       input name: "param2", title: "Z-Wave notifications", description: "Activate excess temperature and/or enclosure opening notifications sent to the main controller", type: "enum", options:[[0:"All notifications disabled"],[1:"Enclosure opening notification enabled"],[2:"Exceeding temperature threshold notification enabled"],[3:"All notifications enabled"]], defaultValue: 0, required: true
       input name: "param3", title: "Visual notifications", description: "Activate visual indications but does not apply to major alarms, such as FIRE, TROUBLE and LOW BATTERY ALARM", type: "enum", options:[[0:"All notifications disabled"],[1:"Enclosure opening notification enabled"],[2:"Exceeding temperature threshold notification enabled"],[4:"Lack of Z-Wave range notification"]], defaultValue: 0, required: true
       input name: "param4", title: "Sound notifications", description: "Activate sound signals but does not apply to major alarms, such as FIRE, TROUBLE and LOW BATTERY ALARM", type: "enum", options:[[0:"All notifications disabled"],[1:"Enclosure opening notification enabled"],[2:"Exceeding temperature threshold notification enabled"],[4:"Lack of Z-Wave range notification"]], defaultValue: 0, required: true
-
-      input name: "param10", title: "Control frames in BASIC", description: "This parameter defines which frames will be sent in the 2-nd Association Group (FIRE ALARM). The values of BASIC ON and BASIC OFF frames may be defined as described in further parameters", type: "enum", options:[[0:"BASIC ON & BASIC OFF enabled"],[1:"BASIC ON enabled"],[2:"BASIC OFF enabled"]], defaultValue: 0, required: true
-      input name: "param11", title: "BASIC ON frame value", description: "BASIC ON frame is sent in case of smoke presence detection and Fire Alarmtriggering. Its value is defined by the parameter", type: "number", range: "0..255",defaultValue: 255, required: true
-      input name: "param12", title: "BASIC OFF frame value", description: "BASIC OFF frame is sent in case of Fire Alarm cancellation. Its value is defined by the parameter", type: "number", range: "0..255",defaultValue: 0, required: true
-      input name: "param13", title: "Alarm broadcast", description: "A value other than 0 means that alarms are being sent in broadcast mode, i.e. to all devices within a FIBARO Smoke Sensor’s range", type: "enum", options:[[0:"Broadcast inactive"],[1:"FIRE ALARM broadcast (2nd & 4th Association Group) active; enclosure opening notification broadcast (3rd & 5th Association Group) inactive"],[2:"FIRE ALARM broadcast (2nd & 4th Association Group) inactive; enclosure opening notification broadcast (3rd & 5th Association Group) active"],[2:"FIRE ALARM broadcast (2nd & 4th Association Group) active; enclosure opening notification broadcast (3rd & 5th Association Group) active"]], defaultValue: 0, required: true
-
-      input name: "param20", title: "Temperature report interval", description: "The temperature report will only be sent if there is a difference in temperature valuefrom the previous value reported", type: "enum", options:[[1:"10s"], [3:"30s"], [6:"60s"], [30:"300s"], [60:"600s"], [180:"1800s"], [360:"3600s"], [864: "8640s"]], defaultValue: 1, required: true
-      input name: "param21", title: "Temperature reports threshold (Hysteresis)", description: "The temperature report will only be sent if there is a difference in temperature valuefrom the previous value reported", type: "enum", options:[[3:"0.3°C"], [5:"0.5°C"], [10:"1°C"], [15:"1.5°C"], [20:"2°C"], [25:"2.5°C"], [30:"3°C"]], defaultValue: 10, required: true
+      input name: "param13", title: "Alarm broadcast", description: "A value other than 0 means that alarms are being sent in broadcast mode, i.e. to all devices within a FIBARO Smoke Sensor’s range", type: "enum", options:[[0:"Broadcast inactive"],[1:"FIRE ALARM broadcast (2nd & 4th Association Group) active; enclosure opening notification broadcast (3rd & 5th Association Group) inactive"],[2:"FIRE ALARM broadcast (2nd & 4th Association Group) inactive; enclosure opening notification broadcast (3rd & 5th Association Group) active"],[3:"FIRE ALARM broadcast (2nd & 4th Association Group) active; enclosure opening notification broadcast (3rd & 5th Association Group) active"]], defaultValue: 0, required: true
+      input name: "param10", title: "Report BASIC command", description: "This parameter defines which frames will be sent in the 2-nd Association Group (FIRE ALARM). The values of BASIC ON and BASIC OFF frames may be defined as described in further parameters", type: "enum", options:[[0:"BASIC ON & BASIC OFF enabled"],[1:"BASIC ON enabled"],[2:"BASIC OFF enabled"]], defaultValue: 0, required: true
+      input name: "param11", title: "BASIC ON value", description: "BASIC ON frame is sent in case of smoke presence detection and Fire Alarmtriggering. Its value is defined by the parameter", type: "number", range: "0..255",defaultValue: 255, required: true
+      input name: "param12", title: "BASIC OFF value", description: "BASIC OFF frame is sent in case of Fire Alarm cancellation. Its value is defined by the parameter", type: "number", range: "0..255",defaultValue: 0, required: true
+      input name: "param20", title: "Temperature report interval", description: "The temperature report will only be sent if there is a difference in temperature valuefrom the previous value reported", type: "enum", options:[[1:"10s"], [3:"30s"], [6:"60s"], [30:"300s"], [60:"600s"], [180:"1800s"], [360:"3600s"], [864: "8640s"]], defaultValue: 3, required: true
+      input name: "param21", title: "Temperature reports threshold (Hysteresis)", description: "The temperature report will only be sent if there is a difference in temperature valuefrom the previous value reported", type: "enum", options:[[2:"0.2°C"], [3:"0.3°C"], [5:"0.5°C"], [10:"1°C"], [15:"1.5°C"], [20:"2°C"], [25:"2.5°C"], [30:"3°C"]], defaultValue: 5, required: true
       input name: "param30", title: "Temperature threshold", description: "Temperature value measured by the built-in temperature sensor above which the excess temperature notification is sent", type: "enum", options:[[40:"100°F / 40°C"], [45:"110°F / 45°C"], [50:"120°F / 50°C"], [55:"130°F / 55°C"], [60:"140°F / 60°C"], [65:"150°F / 65°C"], [71:"160°F / 71°C"], [77:"170°F / 77°C"], [82:"180°F / 82°C"], [93:"200°F / 93°C"]], defaultValue: 55, required: true
       input name: "param31", title: "Temperature excess signaling interval", description: "Time interval of signaling (visual indication/sound) excess temperature level", type: "enum", options:[[1:"10s"], [3:"30s"], [6:"60s"], [30:"300s"], [60:"600s"], [180:"1800s"], [360:"3600s"], [8640: "8640s"]], defaultValue: 1, required: true
-
       input name: "param32", title: "Lack of Z-Wave range interval", description: "Time interval of signaling (visual indication/sound) lack of Z-Wave range", type: "enum", options:[[1:"10s"], [3:"30s"], [6:"60s"], [30:"300s"], [60:"600s"], [180:"1800s"], [360:"3600s"], [8640: "8640s"]], defaultValue: 180, required: true
     }
   }
@@ -72,7 +69,7 @@ metadata {
 def installed() {
   logger("debug", "installed(${VERSION})")
 
-  if (state.driverInfo == null || state.driverInfo.isEmpty()) {
+  if (state.driverInfo == null || state.driverInfo.isEmpty() || state.driverInfo.ver != VERSION) {
     state.driverInfo = [ver:VERSION, status:'Current version']
     state.driverInfo.configSynced = false
   }
@@ -131,6 +128,7 @@ def clearState() {
   } else {
     state.deviceInfo.clear()
   }
+  installed()
 }
 
 private alarmEventSmoke(value) {
@@ -282,22 +280,16 @@ def zwaveEvent(hubitat.zwave.commands.associationv2.AssociationReport cmd) {
   result
 }
 
-def zwaveEvent(hubitat.zwave.commands.timeparametersv1.TimeParametersGet cmd) {
-  logger("trace", "zwaveEvent(TimeParametersGet) - cmd: ${cmd.inspect()}")
-
-  //Time Parameters are requested by an un-encapsulated frame
-  def nowCal = Calendar.getInstance(TimeZone.getTimeZone("UTC"))
-  response(zwave.timeParametersV1.timeParametersReport(year: nowCal.get(Calendar.YEAR), month: (nowCal.get(Calendar.MONTH) + 1), day: nowCal.get(Calendar.DAY_OF_MONTH), hourUtc: nowCal.get(Calendar.HOUR_OF_DAY), minuteUtc: nowCal.get(Calendar.MINUTE), secondUtc: nowCal.get(Calendar.SECOND)).format())
-}
-
 def zwaveEvent(hubitat.zwave.commands.applicationstatusv1.ApplicationBusy cmd) {
   logger("trace", "zwaveEvent(ApplicationBusy) - cmd: ${cmd.inspect()}")
   logger("warn", "Is busy")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.applicationstatusv1.ApplicationRejectedRequest cmd) {
   logger("trace", "zwaveEvent(ApplicationRejectedRequest) - cmd: ${cmd.inspect()}")
   logger("warn", "Rejected the last request")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
@@ -344,25 +336,29 @@ def zwaveEvent(hubitat.zwave.commands.notificationv3.NotificationReport cmd) {
 
 def zwaveEvent(hubitat.zwave.commands.configurationv2.ConfigurationReport cmd) {
   logger("trace", "zwaveEvent(ConfigurationReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.deviceresetlocallyv1.DeviceResetLocallyNotification cmd) {
   logger("trace", "zwaveEvent(DeviceResetLocallyNotification) - cmd: ${cmd.inspect()}")
   logger("warn", "zwaveEvent(DeviceResetLocallyNotification) - device has reset itself")
+  []
 }
 
 
 def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
   logger("trace", "zwaveEvent(BasicReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.basicv1.BasicSet cmd) {
   logger("trace", "zwaveEvent(BasicSet) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.sensoralarmv1.SensorAlarmReport cmd) {
   logger("trace", "zwaveEvent(SensorAlarmReport) - cmd: ${cmd.inspect()}")
-  def map = [isStateChange:true]
+  Map map = [isStateChange:true]
 
   switch (cmd.sensorType) {
     case 1:
@@ -415,8 +411,9 @@ def zwaveEvent(hubitat.zwave.commands.batteryv1.BatteryReport cmd) {
 
 def zwaveEvent(hubitat.zwave.commands.powerlevelv1.PowerlevelReport cmd) {
   logger("trace", "zwaveEvent(PowerlevelReport) - cmd: ${cmd.inspect()}")
-  def power = (cmd.powerLevel > 0) ? "minus${cmd.powerLevel}dBm" : "NormalPower"
+  String power = (cmd.powerLevel > 0) ? "minus${cmd.powerLevel}dBm" : "NormalPower"
   logger("debug", "Powerlevel Report: Power: ${power}, Timeout: ${cmd.timeout}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -429,6 +426,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   state.deviceInfo['zWaveProtocolSubVersion'] = "${cmd.zWaveProtocolSubVersion}"
 
   updateDataValue("firmware", "${cmd.applicationVersion}.${cmd.applicationSubVersion}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificReport cmd) {
@@ -438,6 +436,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificRepor
   state.deviceInfo['deviceIdDataFormat'] = "${cmd.deviceIdDataFormat}"
   state.deviceInfo['deviceIdDataLengthIndicator'] = "l${cmd.deviceIdDataLengthIndicator}"
   state.deviceInfo['deviceIdType'] = "${cmd.deviceIdType}"
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
@@ -451,6 +450,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   String msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
   updateDataValue("MSR", msr)
   updateDataValue("manufacturer", cmd.manufacturerName)
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -458,6 +458,7 @@ def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
 
   state.deviceInfo['firmwareChecksum'] = "${cmd.checksum}"
   state.deviceInfo['firmwareId'] = "${cmd.firmwareId}"
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
@@ -468,9 +469,9 @@ def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cm
   if (encapsulatedCommand) {
     logger("trace", "zwaveEvent(SecurityMessageEncapsulation) - encapsulatedCommand: ${encapsulatedCommand}")
     zwaveEvent(encapsulatedCommand)
-
   } else {
     logger("warn", "zwaveEvent(SecurityMessageEncapsulation) - Unable to extract Secure command from: ${cmd.inspect()}")
+    []
   }
 }
 
@@ -483,6 +484,7 @@ def zwaveEvent(hubitat.zwave.commands.crc16encapv1.Crc16Encap cmd) {
     zwaveEvent(encapsulatedCommand)
   } else {
     logger("warn", "zwaveEvent(Crc16Encap) - Unable to extract CRC16 command from: ${cmd.inspect()}")
+    []
   }
 }
 
@@ -495,27 +497,31 @@ def zwaveEvent(hubitat.zwave.commands.multichannelv3.MultiChannelCmdEncap cmd) {
     zwaveEvent(encapsulatedCommand, cmd.sourceEndPoint as Integer)
   } else {
     logger("warn", "zwaveEvent(MultiChannelCmdEncap) - Unable to extract MultiChannel command from: ${cmd.inspect()}")
+    []
   }
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecuritySchemeReport cmd) {
   logger("trace", "zwaveEvent(SecuritySchemeReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityCommandsSupportedReport cmd) {
   logger("trace", "zwaveEvent(SecurityCommandsSupportedReport) - cmd: ${cmd.inspect()}")
   setSecured()
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.NetworkKeyVerify cmd) {
   logger("trace", "zwaveEvent(NetworkKeyVerify) - cmd: ${cmd.inspect()}")
   logger("info", "Secure inclusion was successful")
   setSecured()
+  []
 }
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
   logger("warn", "zwaveEvent(Command) - Unhandled - cmd: ${cmd.inspect()}")
-  [:]
+  []
 }
 
 private cmd(hubitat.zwave.Command cmd) {
@@ -581,7 +587,7 @@ private logger(level, msg) {
 }
 
 public updateCheck() {
-  def params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Fibaro/Fibaro%20Smoke%20Sensor.groovy"]
+  Map params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Fibaro/Fibaro%20Smoke%20Sensor.groovy"]
   asynchttpGet("updateCheckHandler", params)
 }
 

@@ -65,7 +65,7 @@ metadata {
 def installed() {
   logger("debug", "installed(${VERSION})")
 
-  if (state.driverInfo == null || state.driverInfo.isEmpty()) {
+  if (state.driverInfo == null || state.driverInfo.isEmpty() || state.driverInfo.ver != VERSION) {
     state.driverInfo = [ver:VERSION, status:'Current version']
   }
 
@@ -525,7 +525,7 @@ private logger(level, msg) {
 }
 
 def updateCheck() {
-  def params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Sonoff/Sonoff%20RF%20Bridge.groovy"]
+  Map params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Sonoff/Sonoff%20RF%20Bridge.groovy"]
   asynchttpGet("updateCheckHandler", params)
 }
 

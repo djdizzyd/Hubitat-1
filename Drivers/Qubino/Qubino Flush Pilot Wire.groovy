@@ -14,7 +14,7 @@
 
 import groovy.transform.Field
 
-@Field String VERSION = "1.0.0"
+@Field String VERSION = "1.0.1"
 
 @Field List<String> LOG_LEVELS = ["error", "warn", "info", "debug", "trace"]
 @Field String DEFAULT_LOG_LEVEL = LOG_LEVELS[1]
@@ -33,6 +33,7 @@ metadata {
 
     command "clearState"
     command "pilotMode", [[name:"mode",type:"ENUM", description:"Pilot mode", constraints: ["Stop","Anti Freeze","Eco","Comfort-2","Comfort-1","Comfort"]]]
+    command "onTimer", [[name:"duration",type:"ENUM", description:"Pilot mode", constraints: ["5m","10m","15m","30m","1h","2h","3h","4h","5h","6h","7h","8h"]]]
     attribute "mode", "enum", ["Stop","Anti Freeze","Eco","Comfort-2","Comfort-1","Comfort"]
 
     fingerprint mfr: "0159", prod: "0004", model: "0001", deviceJoinName: "Qubino Flush Pilot Wire" // ZMNHJA2
@@ -65,7 +66,7 @@ metadata {
 def installed() {
   logger("debug", "installed(${VERSION})")
 
-  if (state.driverInfo == null || state.driverInfo.isEmpty()) {
+  if (state.driverInfo == null || state.driverInfo.isEmpty() || state.driverInfo.ver != VERSION) {
     state.driverInfo = [ver:VERSION, status:'Current version']
   }
 
@@ -135,6 +136,31 @@ def off() {
   ], 2000)
 }
 
+def onTimer(String duration) {
+  logger("debug", "onTimer(${duration})")
+
+  // Validate modes
+  Integer duration_value = null
+  Map duration_map = [300:"5m", 600:"10m", 900:"15m", 1800:"30m", 3600:"1h", 7200:"2h", 10800:"3h", 14400:"4h", 18000:"5h", 21600:"6h", 25200:"7h", 28800:"8h"]
+  duration_map.each { it->
+    if (it.value == duration) { duration_value = it.key }
+  }
+
+  if (duration_value == null) {
+    logger("error", "onTimer(${duration}) - Time value is incorrect")
+  } else {
+    logger("info", "onTimer(${duration}) - Pilot turned on for ${duration} (${duration_value})")
+    if(logDescText) { log.info "Pilot turned on for ${duration} (${duration_value})" }
+
+    startTimer(duration_value, off)
+
+    cmdSequence([
+      zwave.basicV1.basicSet(value: 0xFF),
+      zwave.basicV1.basicGet()
+    ], 2000)
+  }
+}
+
 def configure() {
   logger("debug", "configure()")
   def cmds = []
@@ -186,6 +212,7 @@ def clearState() {
   } else {
     state.deviceInfo.clear()
   }
+  installed()
 }
 
 def checkState() {
@@ -197,7 +224,7 @@ def checkState() {
   ], 200)
 }
 
-def setLevel(value) {
+def setLevel(BigDecimal value) {
   logger("debug", "setLevel(${value})")
   Integer level = Math.max(Math.min(value.toInteger(), 99), 0)
   cmdSequence([
@@ -206,7 +233,7 @@ def setLevel(value) {
   ])
 }
 
-def setLevel(value, duration) {
+def setLevel(BigDecimal value, duration) {
   logger("debug", "setLevel(${value}, ${duration})")
   setLevel(value)
 }
@@ -220,7 +247,7 @@ def pilotMode(mode="Stop") {
   }
 
   if (mode_value == null) {
-    logger("error", "3(${mode}) - Pilot Mode is incorrect")
+    logger("error", "pilotMode(${mode}) - Pilot Mode is incorrect")
   } else {
     logger("info", "pilotMode(${mode}) - Pilot Mode value = ${mode_value}")
     if(logDescText) { log.info "Pilot Mode set to ${mode} (${mode_value})" }
@@ -260,29 +287,35 @@ def zwaveEvent(hubitat.zwave.commands.associationv2.AssociationReport cmd) {
 
 def zwaveEvent(hubitat.zwave.commands.configurationv2.ConfigurationReport cmd) {
   logger("trace", "zwaveEvent(ConfigurationReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.deviceresetlocallyv1.DeviceResetLocallyNotification cmd) {
   logger("trace", "zwaveEvent(DeviceResetLocallyNotification) - cmd: ${cmd?.inspect()}")
   logger("warn", "zwaveEvent(DeviceResetLocallyNotification) - device has reset itself")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.basicv1.BasicReport cmd) {
   logger("trace", "zwaveEvent(BasicReport) - cmd: ${cmd.inspect()}")
+  if(logDescText) { log.info "Was turned ${cmd.value ? "on" : "off"}" }
   setLevelEvent(cmd)
 }
 
 def zwaveEvent(hubitat.zwave.commands.switchbinaryv1.SwitchBinaryReport cmd) {
   logger("trace", "zwaveEvent(SwitchBinaryReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.switchmultilevelv3.SwitchMultilevelReport cmd) {
   logger("trace", "zwaveEvent(SwitchMultilevelReport) - cmd: ${cmd.inspect()}")
+  if(logDescText) { log.info "Was turned ${cmd.value ? "on" : "off"}" }
   setLevelEvent(cmd)
 }
 
 def zwaveEvent(hubitat.zwave.commands.sensorbinaryv2.SensorBinaryReport cmd) {
   logger("trace", "zwaveEvent(SensorBinaryReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.sensormultilevelv5.SensorMultilevelReport cmd) {
@@ -301,8 +334,9 @@ def zwaveEvent(hubitat.zwave.commands.sensormultilevelv5.SensorMultilevelReport 
 def zwaveEvent(hubitat.zwave.commands.powerlevelv1.PowerlevelReport cmd) {
   logger("trace", "zwaveEvent(PowerlevelReport) - cmd: ${cmd.inspect()}")
 
-  def power = (cmd.powerLevel > 0) ? "minus${cmd.powerLevel}dBm" : "NormalPower"
+  String power = (cmd.powerLevel > 0) ? "minus${cmd.powerLevel}dBm" : "NormalPower"
   logger("debug", "Powerlevel Report: Power: ${power}, Timeout: ${cmd.timeout}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
@@ -315,6 +349,7 @@ def zwaveEvent(hubitat.zwave.commands.versionv1.VersionReport cmd) {
   state.deviceInfo['zWaveProtocolSubVersion'] = "${cmd.zWaveProtocolSubVersion}"
 
   updateDataValue("firmware", "${cmd.applicationVersion}.${cmd.applicationSubVersion}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificReport cmd) {
@@ -324,6 +359,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.DeviceSpecificRepor
   state.deviceInfo['deviceIdDataFormat'] = "${cmd.deviceIdDataFormat}"
   state.deviceInfo['deviceIdDataLengthIndicator'] = "l${cmd.deviceIdDataLengthIndicator}"
   state.deviceInfo['deviceIdType'] = "${cmd.deviceIdType}"
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecificReport cmd) {
@@ -337,6 +373,7 @@ def zwaveEvent(hubitat.zwave.commands.manufacturerspecificv2.ManufacturerSpecifi
   String msr = String.format("%04X-%04X-%04X", cmd.manufacturerId, cmd.productTypeId, cmd.productId)
   updateDataValue("MSR", msr)
   updateDataValue("manufacturer", cmd.manufacturerName)
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
@@ -344,6 +381,7 @@ def zwaveEvent(hubitat.zwave.commands.firmwareupdatemdv2.FirmwareMdReport cmd) {
 
   state.deviceInfo['firmwareChecksum'] = "${cmd.checksum}"
   state.deviceInfo['firmwareId'] = "${cmd.firmwareId}"
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cmd) {
@@ -356,6 +394,7 @@ def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityMessageEncapsulation cm
     zwaveEvent(encapsulatedCommand)
   } else {
     logger("warn", "zwaveEvent(SecurityMessageEncapsulation) - Unable to extract Secure command from: ${cmd.inspect()}")
+    []
   }
 }
 
@@ -368,6 +407,7 @@ def zwaveEvent(hubitat.zwave.commands.crc16encapv1.Crc16Encap cmd) {
     zwaveEvent(encapsulatedCommand)
   } else {
     logger("warn", "zwaveEvent(Crc16Encap) - Unable to extract CRC16 command from: ${cmd.inspect()}")
+    []
   }
 }
 
@@ -380,27 +420,31 @@ def zwaveEvent(hubitat.zwave.commands.multichannelv3.MultiChannelCmdEncap cmd) {
     zwaveEvent(encapsulatedCommand, cmd.sourceEndPoint as Integer)
   } else {
     logger("warn", "zwaveEvent(MultiChannelCmdEncap) - Unable to extract MultiChannel command from: ${cmd.inspect()}")
+    []
   }
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecuritySchemeReport cmd) {
   logger("trace", "zwaveEvent(SecuritySchemeReport) - cmd: ${cmd.inspect()}")
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.SecurityCommandsSupportedReport cmd) {
   logger("trace", "zwaveEvent(SecurityCommandsSupportedReport) - cmd: ${cmd.inspect()}")
   setSecured()
+  []
 }
 
 def zwaveEvent(hubitat.zwave.commands.securityv1.NetworkKeyVerify cmd) {
   logger("trace", "zwaveEvent(NetworkKeyVerify) - cmd: ${cmd.inspect()}")
   logger("info", "Secure inclusion was successful")
   setSecured()
+  []
 }
 
 def zwaveEvent(hubitat.zwave.Command cmd) {
   logger("warn", "zwaveEvent(Command) - Unhandled - cmd: ${cmd.inspect()}")
-  [:]
+  []
 }
 
 private setLevelEvent(hubitat.zwave.Command cmd) {
@@ -458,6 +502,12 @@ private getCommandClassVersions() {
   ]
 }
 
+private startTimer(Integer seconds, function) {
+  def now = new Date()
+  def runTime = new Date(now.getTime() + (seconds * 1000))
+  runOnce(runTime, function)
+}
+
 /**
  * @param level Level to log at, see LOG_LEVELS for options
  * @param msg Message to log
@@ -476,7 +526,7 @@ private logger(level, msg) {
 }
 
 def updateCheck() {
-  def params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Qubino/Qubino%20Flush%20Pilot%20Wire.groovy"]
+  Map params = [uri: "https://raw.githubusercontent.com/syepes/Hubitat/master/Drivers/Qubino/Qubino%20Flush%20Pilot%20Wire.groovy"]
   asynchttpGet("updateCheckHandler", params)
 }
 
